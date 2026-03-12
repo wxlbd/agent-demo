@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Agent Demo - 设备查询助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .chat-container {
+            height: 500px;
+            overflow-y: auto;
+            padding: 24px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.5;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .status-badge.tool {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-badge.model {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .input-container {
+            padding: 24px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 12px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #messageInput:focus {
+            border-color: #667eea;
+        }
+
+        #sendBtn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        #sendBtn:hover {
+            transform: translateY(-2px);
+        }
+
+        #sendBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .typing-indicator {
+            display: inline-block;
+        }
+
+        .typing-indicator span {
+            animation: blink 1.4s infinite;
+            display: inline-block;
+            margin: 0 1px;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes blink {
+            0% { opacity: 0.2; }
+            50% { opacity: 1; }
+            100% { opacity: 0.2; }
+        }
+
+        .quick-actions {
+            padding: 16px 24px;
+            background: #f8f9fa;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .quick-btn {
+            padding: 8px 16px;
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 IoT Agent Demo</h1>
+            <p>基于 Eino 框架的设备查询智能助手</p>
+        </div>
+
+        <div class="quick-actions">
+            <button class="quick-btn" onclick="setInput('查询设备 CPT-001 的状态')">📱 查询设备状态</button>
+            <button class="quick-btn" onclick="setInput('北京今天天气如何？')">🌤️ 查询天气</button>
+            <button class="quick-btn" onclick="setInput('查询设备状态并结合天气给出维护建议')">💡 维护建议</button>
+            <button class="quick-btn" onclick="setInput('重启设备 CPT-001')">⚙️ 设备控制</button>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="message assistant">
+                <div class="message-content">
+                    你好！我是 IoT 设备管理助手，可以帮你：
+                    <br><br>
+                    • 查询设备实时状态
+                    <br>
+                    • 获取天气信息
+                    <br>
+                    • 给出维护建议
+                    <br>
+                    • 执行设备控制操作
+                    <br><br>
+                    有什么可以帮你的吗？
+                </div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="messageInput" 
+                placeholder="输入消息，例如：查询设备 CPT-001 的状态..."
+                onkeypress="handleKeyPress(event)"
+            >
+            <button id="sendBtn" onclick="sendMessage()">发送</button>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function setInput(text) {
+            messageInput.value = text;
+            messageInput.focus();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function appendMessage(role, content, isStatus = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (isStatus) {
+                contentDiv.innerHTML = `<span class="status-badge tool">${content}</span>`;
+            } else {
+                contentDiv.innerHTML = content.replace(/\n/g, '<br>');
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function appendStreamContent(content) {
+            let lastMessage = chatContainer.lastElementChild;
+            if (!lastMessage || !lastMessage.classList.contains('assistant')) {
+                appendMessage('assistant', '');
+                lastMessage = chatContainer.lastElementChild;
+            }
+            
+            const contentDiv = lastMessage.querySelector('.message-content');
+            contentDiv.innerHTML += content.replace(/\n/g, '<br>');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // 添加用户消息
+            appendMessage('user', message);
+            messageInput.value = '';
+            sendBtn.disabled = true;
+
+            // 添加思考状态
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'message assistant';
+            thinkingDiv.id = 'thinking';
+            thinkingDiv.innerHTML = `
+                <div class="message-content">
+                    <span class="status-badge model">🤔 思考中<span>.</span><span>.</span><span>.</span></span>
+                </div>
+            `;
+            chatContainer.appendChild(thinkingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                const response = await fetch('/api/v1/chat/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: 'web-demo-' + Date.now()
+                    })
+                });
+
+                // 移除思考状态
+                const thinkingEl = document.getElementById('thinking');
+                if (thinkingEl) thinkingEl.remove();
+
+                // 处理 SSE 流
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (line.startsWith('event: ')) {
+                            const eventType = line.slice(7);
+                            const dataLine = lines[lines.indexOf(line) + 1];
+                            if (dataLine && dataLine.startsWith('data: ')) {
+                                const data = dataLine.slice(6);
+                                handleSSEEvent(eventType, data);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                appendMessage('assistant', `❌ 错误：${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        function handleSSEEvent(eventType, data) {
+            console.log('SSE Event:', eventType, data);
+
+            switch (eventType) {
+                case 'tool_start':
+                    appendMessage('assistant', `🔧 正在调用工具：${data}`, true);
+                    break;
+                case 'tool_done':
+                    appendMessage('assistant', `✅ 工具完成：${data}`, true);
+                    break;
+                case 'model_start':
+                    // 可选：显示思考开始
+                    break;
+                case 'message':
+                    appendStreamContent(data);
+                    break;
+                case 'done':
+                    // 流式结束
+                    break;
+                case 'error':
+                    appendMessage('assistant', `❌ ${data}`);
+                    break;
+            }
+        }
+    </script>
+</body>
+</html>
